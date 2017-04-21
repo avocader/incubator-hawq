@@ -234,4 +234,8 @@ public class Utilities {
             return false;
         }
     }
+
+    public static boolean useVectorization(InputData inputData) {
+        return "HiveVectorizedORC".equals(inputData.getProfile());
+    }
 }

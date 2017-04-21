@@ -19,6 +19,7 @@ package org.apache.hawq.pxf.plugins.hive;
  * under the License.
  */
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
 import org.apache.hadoop.hive.ql.io.orc.Reader;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;

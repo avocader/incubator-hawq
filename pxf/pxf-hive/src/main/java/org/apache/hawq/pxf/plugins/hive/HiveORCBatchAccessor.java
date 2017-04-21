@@ -20,49 +20,96 @@ package org.apache.hawq.pxf.plugins.hive;
  */
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapred.*;
 import org.apache.hawq.pxf.api.OneRow;
+import org.apache.hawq.pxf.api.ReadAccessor;
+import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
+import org.apache.hawq.pxf.api.utilities.Plugin;
+import org.apache.hawq.pxf.api.utilities.Utilities;
+import org.apache.hawq.pxf.plugins.hdfs.utilities.HdfsUtilities;
+import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 import org.apache.hadoop.hive.ql.io.orc.OrcFile;
 import org.apache.hadoop.hive.ql.io.orc.Reader;
+import org.apache.hadoop.hive.ql.io.orc.Reader.Options;
 import org.apache.hadoop.hive.ql.io.orc.RecordReader;
 import org.apache.hadoop.io.LongWritable;
 
-public class HiveORCBatchAccessor extends HiveAccessor {
+/**
+ * Accessor class which reads data in batches.
+ * One batch is 1024 rows of all projected columns
+ *
+ */
+public class HiveORCBatchAccessor extends Plugin implements ReadAccessor {
 
     protected RecordReader vrr;
     private int batchIndex;
+    private VectorizedRowBatch batch;
 
     public HiveORCBatchAccessor(InputData input) throws Exception {
         super(input);
     }
 
     @Override
-    protected boolean getNextSplit() throws IOException {
-        Reader reader = OrcFile.createReader(
-                new Path(inputData.getDataSource()),
-                OrcFile.readerOptions(jobConf));
-        vrr = reader.rows();
+    public boolean openForRead() throws Exception {
+        Reader reader = HiveUtilities.getOrcReader(inputData);
+        Options options = new Options();
+        addColumns(options);
+        addFragments(options);
+        vrr = reader.rowsOptions(options);
         return vrr.hasNext();
     }
 
+    /**
+     * File might have multiple splits, so this method restricts
+     * reader to one split.
+     * @param options reader options to modify
+     */
+    private void addFragments(Options options) {
+        FileSplit fileSplit = HdfsUtilities.parseFileSplit(inputData);
+        options.range(fileSplit.getStart(), fileSplit.getLength());
+    }
+
+    /**
+     * Reads next batch for current fragment.
+     * @return next batch in OneRow format, key is a batch number, data is a batch
+     */
     @Override
     public OneRow readNextObject() throws IOException {
-        data = vrr.nextBatch((VectorizedRowBatch) data);
-        batchIndex++;
-        if (data == null) {
-            if (getNextSplit()) {
-                data = vrr.nextBatch((VectorizedRowBatch) data);
-                batchIndex++;
-                if (data == null) {
-                    return null;
-                }
-            } else {
-                return null;
+        if (vrr.hasNext()) {
+            batch = vrr.nextBatch(batch);
+            batchIndex++;
+            return new OneRow(new LongWritable(batchIndex), batch);
+        } else {
+            //All batches are exhausted
+            return null;
+        }
+    }
+
+    /**
+     * This method updated reader optionst to include projected columns only.
+     * @param options reader options to modify
+     * @throws Exception
+     */
+    private void addColumns(Options options) throws Exception {
+        boolean[] includeColumns = new boolean[inputData.getColumns() + 1];
+        for (ColumnDescriptor col : inputData.getTupleDescription()) {
+            if (col.isProjected()) {
+                includeColumns[col.columnIndex() + 1] = true;
             }
         }
-        key = new LongWritable(batchIndex);
-        return new OneRow(key, (VectorizedRowBatch) data);
+        options.include(includeColumns);
+    }
+
+    @Override
+    public void closeForRead() throws Exception {
+        if (vrr != null) {
+            vrr.close();
+        }
     }
 }
