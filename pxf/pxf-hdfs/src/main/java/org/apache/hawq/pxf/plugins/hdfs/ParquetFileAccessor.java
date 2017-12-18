@@ -33,7 +33,6 @@ import org.apache.parquet.example.data.Group;
 import org.apache.parquet.example.data.simple.convert.GroupRecordConverter;
 import org.apache.parquet.format.converter.ParquetMetadataConverter;
 import org.apache.parquet.hadoop.ParquetFileReader;
-import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.io.ColumnIOFactory;
 import org.apache.parquet.io.MessageColumnIO;
 import org.apache.parquet.io.RecordReader;
@@ -47,9 +46,9 @@ import java.util.Iterator;
  */
 public class ParquetFileAccessor extends Plugin implements ReadAccessor {
     private ParquetFileReader reader;
-    private MessageType schema;
     private MessageColumnIO columnIO;
     private RecordIterator recordIterator;
+    private MessageType schema;
 
 
     private class RecordIterator implements Iterator<OneRow> {
@@ -71,7 +70,7 @@ public class ParquetFileAccessor extends Plugin implements ReadAccessor {
 
         @Override
         public OneRow next() {
-            return new OneRow(schema, readNextGroup());
+            return new OneRow(null, readNextGroup());
         }
 
         private void readNextRowGroup() {
@@ -125,6 +124,8 @@ public class ParquetFileAccessor extends Plugin implements ReadAccessor {
      */
     public ParquetFileAccessor(InputData input) {
         super(input);
+        ParquetUserData parquetUserData = HdfsUtilities.parseParquetUserData(input);
+        schema = parquetUserData.getSchema();
     }
 
     @Override
@@ -135,9 +136,7 @@ public class ParquetFileAccessor extends Plugin implements ReadAccessor {
         // Create reader for a given split, read a range in file
         reader = new ParquetFileReader(conf, file, ParquetMetadataConverter.range(
                 fileSplit.getStart(), fileSplit.getStart() + fileSplit.getLength()));
-        ParquetMetadata metadata = ParquetFileReader.readFooter(
-                conf, file, ParquetMetadataConverter.NO_FILTER);
-        schema = metadata.getFileMetaData().getSchema();
+        ParquetUserData parquetUserData = HdfsUtilities.parseParquetUserData(inputData);
         columnIO = new ColumnIOFactory().getColumnIO(schema);
         recordIterator = new RecordIterator(reader);
         return recordIterator.hasNext();

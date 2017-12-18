@@ -8,9 +8,9 @@ package org.apache.hawq.pxf.plugins.hdfs;
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -18,8 +18,6 @@ package org.apache.hawq.pxf.plugins.hdfs;
  * specific language governing permissions and limitations
  * under the License.
  */
-
-import static org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.INT32;
 
 import org.apache.hawq.pxf.api.OneField;
 import org.apache.hawq.pxf.api.OneRow;
@@ -29,8 +27,8 @@ import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.Plugin;
 
+import org.apache.hawq.pxf.plugins.hdfs.utilities.HdfsUtilities;
 import org.apache.parquet.example.data.Group;
-import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.OriginalType;
 import org.apache.parquet.schema.PrimitiveType;
 import org.apache.parquet.schema.Type;
@@ -53,6 +51,7 @@ public class ParquetResolver extends Plugin implements ReadResolver {
      * @param metaData the InputData
      */
     public ParquetResolver(InputData metaData) {
+
         super(metaData);
     }
 
@@ -60,19 +59,19 @@ public class ParquetResolver extends Plugin implements ReadResolver {
     @Override
     public List<OneField> getFields(OneRow row) throws Exception {
         Object data = row.getData();
-        MessageType schema = (MessageType) row.getKey();
+        ParquetUserData parquetUserData = HdfsUtilities.parseParquetUserData(inputData);
         Group g = (Group) data;
-        List<OneField> output = resolveRecord(schema, g);
+        List<OneField> output = resolveRecord(parquetUserData, g);
 
         return output;
     }
 
-    private List<OneField> resolveRecord(MessageType schema, Group g) {
+    private List<OneField> resolveRecord(ParquetUserData userData, Group g) {
         List<OneField> output = new LinkedList<OneField>();
 
-        for (int i = 0; i < schema.getFieldCount(); i++) {
-            if (schema.getType(i).isPrimitive()) {
-                output.add(resolvePrimitive(i, g, schema.getType(i)));
+        for (int i = 0; i < userData.getSchema().getFieldCount(); i++) {
+            if (userData.getSchema().getType(i).isPrimitive()) {
+                output.add(resolvePrimitive(i, g, userData.getSchema().getType(i)));
             } else {
                 throw new UnsupportedTypeException("Only primitive types are supported.");
             }

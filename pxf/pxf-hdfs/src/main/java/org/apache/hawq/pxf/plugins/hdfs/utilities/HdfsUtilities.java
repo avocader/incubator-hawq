@@ -19,7 +19,6 @@ package org.apache.hawq.pxf.plugins.hdfs.utilities;
  * under the License.
  */
 
-
 import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.OneField;
 import org.apache.hawq.pxf.api.utilities.FragmentMetadata;
@@ -41,6 +40,9 @@ import org.apache.hadoop.io.compress.CompressionCodecFactory;
 import org.apache.hadoop.io.compress.SplittableCompressionCodec;
 import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hawq.pxf.plugins.hdfs.ParquetUserData;
+import org.apache.parquet.schema.MessageType;
+import org.apache.parquet.schema.MessageTypeParser;
 
 import java.io.*;
 import java.util.List;
@@ -163,15 +165,30 @@ public class HdfsUtilities {
     public static byte[] prepareFragmentMetadata(long start, long length, String[] locations)
             throws IOException {
 
-        ByteArrayOutputStream byteArrayStream = new ByteArrayOutputStream();
-        ObjectOutputStream objectStream = new ObjectOutputStream(
-                byteArrayStream);
-        objectStream.writeLong(start);
-        objectStream.writeLong(length);
-        objectStream.writeObject(locations);
+        ByteArrayOutputStream byteArrayStream = writeBaseFragmentInfo(start, length, locations);
 
         return byteArrayStream.toByteArray();
 
+    }
+
+    private static ByteArrayOutputStream writeBaseFragmentInfo(long start, long length, String[] locations) throws IOException {
+        ByteArrayOutputStream byteArrayStream = new ByteArrayOutputStream();
+        ObjectOutputStream objectStream = new ObjectOutputStream(byteArrayStream);
+        objectStream.writeLong(start);
+        objectStream.writeLong(length);
+        objectStream.writeObject(locations);
+        return byteArrayStream;
+    }
+
+    public static byte[] prepareFragmentMetadata(long start,
+                                                 long length,
+                                                 String[] locations,
+                                                 Object additionalMetadata)
+            throws IOException {
+        ByteArrayOutputStream baos = writeBaseFragmentInfo(start, length, locations);
+        ObjectOutputStream objectStream = new ObjectOutputStream(baos);
+        objectStream.writeObject(additionalMetadata);
+        return baos.toByteArray();
     }
 
     /**
@@ -240,5 +257,15 @@ public class HdfsUtilities {
             delim = delimiter;
         }
         return buff.toString();
+    }
+
+    public static byte[] makeParquetUserData(MessageType schema) throws IOException {
+        ParquetUserData userData = new ParquetUserData(schema);
+        return userData.toString().getBytes();
+    }
+
+    public static ParquetUserData parseParquetUserData(InputData input) {
+        MessageType schema = MessageTypeParser.parseMessageType(new String(input.getFragmentUserData()));
+        return new ParquetUserData(schema);
     }
 }
