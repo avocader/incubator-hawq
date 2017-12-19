@@ -81,6 +81,3 @@ HADOOP_ROOT/hbase/lib/htrace-core*.jar
 HADOOP_ROOT/hbase/lib/netty*.jar
 HADOOP_ROOT/hbase/lib/zookeeper*.jar
 HADOOP_ROOT/hbase/lib/metrics-core*.jar
-
-# Parquet library
-/Users/adiachenko/Desktop/parquet-hadoop-bundle-1.9.0.jar
