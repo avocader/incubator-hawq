@@ -73,6 +73,11 @@ public class ParquetFileAccessor extends Plugin implements ReadAccessor {
             return new OneRow(null, readNextGroup());
         }
 
+        @Override
+        public void remove() {
+            throw new UnsupportedOperationException();
+        }
+
         private void readNextRowGroup() {
             try {
                 currentRowGroup = reader.readNextRowGroup();
