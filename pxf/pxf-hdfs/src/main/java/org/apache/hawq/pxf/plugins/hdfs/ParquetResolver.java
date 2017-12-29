@@ -97,7 +97,13 @@ public class ParquetResolver extends Plugin implements ReadResolver {
                 break;
             }
             case INT32: {
-                field.type = DataType.INTEGER.getOID();
+                if (originalType == OriginalType.INT_8) {
+                    field.type = DataType.SMALLINT.getOID();
+                } else if (originalType == OriginalType.INT_16) {
+                    field.type = DataType.SMALLINT.getOID();
+                } else {
+                    field.type = DataType.INTEGER.getOID();
+                }
                 field.val = g.getFieldRepetitionCount(columnIndex) == 0 ?
                         null : g.getInteger(columnIndex, 0);
                 break;
